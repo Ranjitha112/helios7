@@ -1,0 +1,48 @@
+node ('docker06')
+{
+   
+sh 'hostname'
+ //sh 'wget http://ctt.med.ge.com/linux/helios/HELiOS-7-experimental/iso/HELiOS-DVD-x86_64-7.3.iso'
+   
+sh 'mkdir -p /mnt/helios-repo'
+   sh 'umount /mnt/helios-repo'
+   
+sh 'mount -o loop /dockerspace/vis/experiments/helios7/HELiOS-DVD-x86_64-7.3.iso /mnt/helios-repo'
+   
+sh 'mkdir -p /helios7-root && export rpm_root=/helios7-root '
+   
+sh 'rpm --root /helios7-root --initdb'
+   
+//sh 'rpm --root /helios7-root -ivh /mnt/helios-repo/Packages/helios-release-7.3-5.helios7.x86_64.rpm && rm -f /helios7-root/etc/yum.repos.d/*.repo'
+   
+sh 'rpm --root /helios7-root --import  /mnt/helios-repo/RPM-GPG-KEY-redhat-*'
+   
+sh '''cat >/helios7-root/etc/yum.repos.d/helios.repo<<EOF
+[helios]
+baseurl=file:///mnt/helios-repo
+enabled=1
+gpgcheck=0
+EOF'''
+  sh '''cat >/helios7-root/etc/yum.repos.d/helios_web.repo<<EOF
+[helios]
+name=HELiOS Web Repository
+baseurl=http://3.70.206.4/linux/helios/HELiOS-7-experimental/os/x86_64
+enabled=1
+gpgcheck=0
+EOF'''
+  
+   
+sh 'yum -y --installroot=/helios7-root install yum && yum clean metadata && yum clean packages && yum clean headers && yum clean all'  
+   
+sh '''chroot /helios7-root  /bin/bash -c "localedef --list-archive | grep -v -i ^en | xargs localedef --delete-from-archive && mv /usr/lib/locale/locale-archive /usr/lib/locale/locale-archive.tmpl && build-locale-archive"'''
+   
+sh 'rm -rf /helios7-root/etc/yum.repos.d/helios.repo' 
+   
+sh '''tar -C /helios7-root/ -c . -vzf /mnt/helios7-${image_version}.tar.gz --exclude=./proc --exclude=./sys --exclude=./mnt --exclude=./var/cache --exclude=./usr/share/doc --exclude=./usr/share/locale --exclude=./usr/libexec/gcc --exclude=./usr/include -C /helios7-root/usr/include/python2.7 && docker import /mnt/helios7-${image_version}.tar.gz helios7:${image_version} && docker images'''
+   
+sh 'docker tag helios7:${image_version} hc-us-east-aws-artifactory.cloud.health.ge.com/coreload-all/helios7:${image_version}'
+   
+sh 'docker push hc-us-east-aws-artifactory.cloud.health.ge.com/coreload-all/helios7:${image_version}'
+   
+
+}
